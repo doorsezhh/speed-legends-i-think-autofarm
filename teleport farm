@@ -1,0 +1,94 @@
+-- Create a simple GUI
+local ScreenGui = Instance.new("ScreenGui")
+local StartButton = Instance.new("TextButton")
+
+-- Set up the GUI properties
+ScreenGui.Name = "GemAutofarmGui"
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+StartButton.Parent = ScreenGui
+StartButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+StartButton.Size = UDim2.new(0, 200, 0, 50)
+StartButton.Position = UDim2.new(0.5, -100, 0.5, -25)
+StartButton.Text = "Start Autofarm"
+
+-- Function to teleport the character to the current Gem or Orb
+local function teleportToTarget(target)
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- Teleport directly to the target's position
+    if target and target:IsA("Model") and target.PrimaryPart then
+        local targetPosition = target.PrimaryPart.Position + Vector3.new(0, 3, 0) -- Adjust height if needed
+        humanoidRootPart.CFrame = CFrame.new(targetPosition)
+        print("Teleported to:", target.Name, "at:", targetPosition)
+    else
+        print("Target or PrimaryPart not found.")
+    end
+end
+
+-- Function that continuously fires the orb collection event
+local function collectOrbs()
+    local args = {
+        [1] = "collectOrb",
+        [2] = "Red Orb",
+        [3] = "City"
+    }
+
+    while true do
+        game:GetService("ReplicatedStorage"):WaitForChild("rEvents"):WaitForChild("orbEvent"):FireServer(unpack(args))
+        wait(0.1) -- Adjust the interval if needed to avoid server overload
+    end
+end
+
+-- Function that continuously searches for Gems and Orbs
+local function autoFarmGems()
+    local orbFolder = workspace:WaitForChild("orbFolder")
+    local city = orbFolder:WaitForChild("City")
+    
+    -- Run the orb collection event in parallel
+    spawn(collectOrbs)
+
+    while true do
+        -- Find the Gem
+        local gem = city:FindFirstChild("Gem")
+
+        if gem then
+            -- If a Gem is found, teleport to it
+            teleportToTarget(gem)
+
+            -- Wait for the Gem to be destroyed before continuing
+            gem:GetPropertyChangedSignal("Parent"):Wait()
+            print("Gem collected and destroyed! Looking for the next Gem.")
+        else
+            -- If no Gem is found, look for the Blue Orb
+            local blueOrb = city:FindFirstChild("Blue Orb")
+            if blueOrb then
+                print("No Gem found. Teleporting to Blue Orb...")
+                teleportToTarget(blueOrb) -- Teleport to Blue Orb
+            else
+                -- If no Blue Orb is found, look for the Red Orb
+                local redOrb = city:FindFirstChild("Red Orb")
+                if redOrb then
+                    print("No Gem or Blue Orb found. Teleporting to Red Orb...")
+                    teleportToTarget(redOrb) -- Teleport to Red Orb
+                else
+                    print("No Gem, Blue Orb, or Red Orb found. Waiting for new spawns...")
+                end
+            end
+            wait(2) -- Wait longer to give time for new gems or orbs to spawn
+        end
+    end
+end
+
+-- Connect the button to start the autofarm
+StartButton.MouseButton1Click:Connect(function()
+    print("Autofarm started!")
+    autoFarmGems() -- Start the autofarm loop when the button is clicked
+end)
+
+-- Ensure the GUI remains visible after respawn
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+end)
